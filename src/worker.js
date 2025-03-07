@@ -3,6 +3,24 @@ export default {
         const url = new URL(request.url);
         const path = url.pathname;
 
+        // 处理 favicon.ico 请求
+        if (path === '/favicon.ico') {
+            const favicon = await env.MY_BUCKET.get('favicon.ico');
+            if (favicon) {
+                const response = new Response(favicon.body, {
+                    headers: {
+                        'Content-Type': 'image/x-icon',
+                        'Cache-Control': 'public, max-age=31536000'
+                    }
+                });
+                // 添加 CORS 头
+                response.headers.set('Access-Control-Allow-Origin', '*');
+                return response;
+            }
+            // 如果没有找到图标，返回404
+            return new Response('Not Found', { status: 404 });
+        }
+
         // 处理静态文件路由
         if (path === '/' || path === '/index.html') {
             return new Response(INDEX_HTML, {
@@ -56,6 +74,8 @@ const INDEX_HTML = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>R2 图床 - 简单高效的图片托管服务</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -125,31 +145,35 @@ const ADMIN_HTML = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>图片管理 - R2 图床</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
-        <header class="main-header">
-            <div class="header-content">
-                <h1>图片管理</h1>
-                <p class="subtitle">管理您上传的所有图片</p>
-            </div>
-            <div class="header-actions">
-                <div class="action-group">
-                    <button id="selectAllBtn" class="btn">全选</button>
-                    <button id="uploadBtn" class="btn primary">上传图片</button>
+        <div class="card header-card">
+            <header class="main-header">
+                <div class="header-content">
+                    <h1>图片管理</h1>
+                    <p class="subtitle">管理您上传的所有图片</p>
                 </div>
-                <div class="action-group">
-                    <select id="moveToFolder" class="folder-select">
-                        <option value="">移动到...</option>
-                    </select>
-                    <button id="moveBtn" class="btn" disabled>移动</button>
-                    <button id="deleteBtn" class="btn danger">删除</button>
+                <div class="header-actions">
+                    <div class="action-group">
+                        <button id="selectAllBtn" class="btn">全选</button>
+                        <button id="uploadBtn" class="btn primary">上传图片</button>
+                    </div>
+                    <div class="action-group">
+                        <select id="moveToFolder" class="folder-select">
+                            <option value="">移动到...</option>
+                        </select>
+                        <button id="moveBtn" class="btn" disabled>移动</button>
+                        <button id="deleteBtn" class="btn danger">删除</button>
+                    </div>
+                    <a href="/" class="btn">返回首页</a>
+                    <input type="file" id="fileInput" multiple hidden>
                 </div>
-                <a href="/" class="btn">返回首页</a>
-                <input type="file" id="fileInput" multiple hidden>
-            </div>
-        </header>
+            </header>
+        </div>
 
         <div class="card">
             <div class="image-grid" id="imageGrid">
@@ -163,8 +187,8 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
 const STYLE_CSS = `
 :root {
-    --primary-color: #3498db;
-    --primary-dark: #2980b9;
+    --primary-color: #4a90e2;
+    --primary-dark: #357abd;
     --danger-color: #e74c3c;
     --danger-dark: #c0392b;
     --gray-color: #95a5a6;
@@ -173,6 +197,9 @@ const STYLE_CSS = `
     --text-light: #7f8c8d;
     --border-color: #e1e1e1;
     --background-color: #f5f7fa;
+    --success-color: #2ecc71;
+    --card-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    --transition-speed: 0.2s;
 }
 
 * {
@@ -199,6 +226,10 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    background: white;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
 }
 
 .header-content {
@@ -230,10 +261,25 @@ h1 {
 
 .card {
     background: white;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    margin-bottom: 30px;
-    overflow: hidden;
+    border-radius: 8px;
+    border: none;
+    margin-bottom: 12px;
+    box-shadow: var(--card-shadow);
+    transition: box-shadow var(--transition-speed);
+    overflow: visible;
+}
+
+.card.header-card {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    margin-bottom: 12px;
+    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 .card-header {
@@ -247,11 +293,11 @@ h1 {
 .btn {
     padding: 10px 20px;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
-    transition: background 0.2s;
+    transition: all var(--transition-speed);
     text-decoration: none;
     display: inline-flex;
     align-items: center;
@@ -259,10 +305,12 @@ h1 {
     background: var(--gray-color);
     color: white;
     min-width: 100px;
+    gap: 8px;
 }
 
 .btn:hover {
     background: var(--gray-dark);
+    transform: translateY(-1px);
 }
 
 .btn.primary {
@@ -281,6 +329,13 @@ h1 {
     background: var(--danger-dark);
 }
 
+.btn:disabled {
+    background: var(--gray-color);
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .header-actions {
     display: flex;
     gap: 16px;
@@ -289,45 +344,84 @@ h1 {
 
 .action-group {
     display: flex;
-    gap: 8px;
+    gap: 12px;
     align-items: center;
     padding-right: 16px;
     border-right: 1px solid var(--border-color);
 }
 
-.action-group:last-of-type {
+.action-group:last-child {
     border-right: none;
+    padding-right: 0;
 }
 
 .folder-select {
     padding: 10px 16px;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 14px;
     background: white;
     color: var(--text-color);
     min-width: 180px;
+    transition: all var(--transition-speed);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+    padding-right: 32px;
+}
+
+.folder-select:hover, .folder-select:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
 }
 
 .image-item {
     position: relative;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: 8px;
     overflow: hidden;
     background: white;
+    border: 1px solid var(--border-color);
+    transition: all var(--transition-speed);
+    box-shadow: var(--card-shadow);
 }
 
-.image-checkbox-wrapper {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    z-index: 1;
+.image-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-.image-checkbox {
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
+.image-preview {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    transition: transform var(--transition-speed);
+}
+
+.image-item:hover .image-preview {
+    transform: scale(1.05);
+}
+
+.image-info {
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.image-name {
+    font-size: 14px;
+    margin-bottom: 4px;
+    color: var(--text-color);
+    word-break: break-all;
+    font-weight: 500;
+}
+
+.image-url {
+    font-size: 12px;
+    color: var(--text-light);
+    word-break: break-all;
 }
 
 .image-actions {
@@ -337,7 +431,7 @@ h1 {
     display: flex;
     gap: 8px;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity var(--transition-speed);
 }
 
 .image-item:hover .image-actions {
@@ -346,48 +440,177 @@ h1 {
 
 .action-btn {
     padding: 6px 12px;
-    background: rgba(52, 152, 219, 0.9);
+    background: var(--primary-color);
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     font-size: 12px;
+    transition: all var(--transition-speed);
+    backdrop-filter: blur(4px);
 }
 
 .action-btn:hover {
-    background: rgba(41, 128, 185, 0.9);
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+.image-checkbox-wrapper {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity var(--transition-speed);
+}
+
+.image-item:hover .image-checkbox-wrapper {
+    opacity: 1;
+}
+
+.image-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    border-radius: 4px;
+    border: 2px solid var(--primary-color);
+    appearance: none;
+    position: relative;
+    transition: all var(--transition-speed);
+    background: transparent;
+}
+
+.image-checkbox:checked {
+    background: var(--primary-color);
+}
+
+.image-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 12px 24px;
+    border-radius: 6px;
+    color: white;
+    font-size: 14px;
+    z-index: 1000;
+    animation: fadeInOut 3s ease-in-out forwards;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notification.success {
+    background: var(--success-color);
+}
+
+.notification.error {
+    background: var(--danger-color);
+}
+
+.loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(74, 144, 226, 0.1);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(20px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-20px); }
+}
+
+.upload-section {
+    position: relative;
+    padding-bottom: 24px;
+}
+
+.upload-options {
+    padding: 0 36px;
+    margin: 24px 0;
+    position: relative;
+    z-index: 1;
 }
 
 .upload-area {
     border: 2px dashed var(--primary-color);
-    border-radius: 6px;
-    margin: 24px;
-    padding: 48px;
+    border-radius: 8px;
+    margin: 0 36px 36px;
+    padding: 64px 48px;
     text-align: center;
     background: white;
-    transition: background 0.2s;
+    transition: all var(--transition-speed);
     cursor: pointer;
+    position: relative;
 }
 
 .upload-area:hover {
     background: var(--background-color);
+    border-color: var(--primary-dark);
+    transform: translateY(-1px);
 }
 
 .upload-hint {
     color: var(--text-light);
+    margin-bottom: 16px;
 }
 
 .upload-icon {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 16px;
+    width: 64px;
+    height: 64px;
+    margin-bottom: 24px;
     fill: var(--primary-color);
+    transition: transform var(--transition-speed);
+}
+
+.upload-area:hover .upload-icon {
+    transform: translateY(-4px);
 }
 
 .sub-hint {
     font-size: 14px;
-    margin-top: 8px;
+    margin-top: 12px;
     color: var(--text-light);
+}
+
+.folder-select-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
 }
 
 .recent-grid {
@@ -459,10 +682,6 @@ h1 {
 
 .image-item:hover .copy-btn {
     opacity: 1;
-}
-
-.copy-btn:hover {
-    background: rgba(41, 128, 185, 0.9);
 }
 
 .image-item .move-btn {
@@ -546,74 +765,53 @@ h1 {
     100% { opacity: 0; transform: translateY(-20px); }
 }
 
-.loading {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
+@media (max-width: 768px) {
+    .header-actions {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .action-group {
+        border-right: none;
+        padding-right: 0;
+        width: 100%;
+    }
+    
+    .folder-select {
+        width: 100%;
+    }
 
-.loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 3px solid var(--border-color);
-    border-radius: 50%;
-    border-top-color: var(--primary-color);
-    animation: spin 1s linear infinite;
-}
+    .image-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+        padding: 16px;
+    }
 
-@keyframes spin {
-    100% { transform: rotate(360deg); }
-}
+    .card {
+        margin-bottom: 10px;
+    }
 
-.upload-options {
-    padding: 0 24px;
-    margin-bottom: 20px;
-}
+    .upload-area {
+        margin: 0 20px 24px;
+        padding: 48px 24px;
+    }
+    
+    .upload-options {
+        padding: 0 20px;
+        margin: 20px 0;
+    }
 
-.upload-options label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    color: var(--text-light);
-}
+    .card.header-card {
+        margin: 0 -20px 12px;
+        padding: 0 20px;
+        border-radius: 0;
+    }
 
-.upload-options input[type="checkbox"] {
-    margin: 0;
-}
-
-.notification {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 12px 24px;
-    border-radius: 4px;
-    color: white;
-    font-size: 14px;
-    z-index: 1000;
-    animation: fadeInOut 3s ease-in-out forwards;
-}
-
-.notification.success {
-    background: rgba(46, 204, 113, 0.9);
-}
-
-.notification.error {
-    background: rgba(231, 76, 60, 0.9);
-}
-
-@keyframes fadeInOut {
-    0% { opacity: 0; transform: translateY(20px); }
-    10% { opacity: 1; transform: translateY(0); }
-    90% { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(-20px); }
+    .upload-icon {
+        width: 48px;
+        height: 48px;
+        margin-bottom: 20px;
+    }
 }
 `;
 
