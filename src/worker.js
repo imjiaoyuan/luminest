@@ -786,7 +786,12 @@ const SCRIPT_JS = `
                     if (!response.ok) throw new Error('Failed to load images');
                     
                     const images = await response.json();
+                    
+                    // 按上传时间从新到旧排序
+                    images.sort((a, b) => new Date(b.uploaded) - new Date(a.uploaded));
+                    
                     this.imageList.innerHTML = '';
+                    // 只显示前5张图片
                     images.slice(0, 5).forEach(image => {
                         this.addImageToList(image, false);
                     });
@@ -924,6 +929,10 @@ const SCRIPT_JS = `
                 this.initEventListeners();
                 this.loadImages();
                 this.loadFolders();
+                
+                // 添加懒加载相关属性
+                this.observer = null;
+                this.initLazyLoading();
             }
 
             initEventListeners() {
@@ -958,10 +967,8 @@ const SCRIPT_JS = `
                     
                     const images = await response.json();
                     
-                    // 按时间从新到旧排序
-                    images.sort((a, b) => {
-                        return new Date(b.uploaded) - new Date(a.uploaded);
-                    });
+                    // 按上传时间从新到旧排序
+                    images.sort((a, b) => new Date(b.uploaded) - new Date(a.uploaded));
 
                     this.imageGrid.innerHTML = '';  // 清空现有图片
                     images.forEach(image => {
@@ -1009,6 +1016,26 @@ const SCRIPT_JS = `
                 }
             }
 
+            initLazyLoading() {
+                // 创建 Intersection Observer
+                this.observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            if (img.dataset.src) {
+                                img.src = img.dataset.src;
+                                img.removeAttribute('data-src');
+                                this.observer.unobserve(img);
+                            }
+                        }
+                    });
+                }, {
+                    root: null,
+                    rootMargin: '50px',
+                    threshold: 0.1
+                });
+            }
+
             renderImage(image) {
                 const item = document.createElement('div');
                 item.className = 'image-item';
@@ -1020,7 +1047,10 @@ const SCRIPT_JS = `
                     <div class="image-checkbox-wrapper">
                         <input type="checkbox" class="image-checkbox" \${this.selectedImages.has(image.name) ? 'checked' : ''}>
                     </div>
-                    <img src="\${image.url}" alt="\${image.name}" class="image-preview">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E" 
+                         data-src="\${image.url}" 
+                         alt="\${image.name}" 
+                         class="image-preview">
                     <div class="image-info">
                         <div class="image-name">\${image.name}</div>
                         <div class="image-url">\${image.url}</div>
@@ -1031,6 +1061,7 @@ const SCRIPT_JS = `
                     </div>
                 \`;
 
+                // 添加复选框事件监听
                 const checkbox = item.querySelector('.image-checkbox');
                 checkbox.addEventListener('change', () => {
                     if (checkbox.checked) {
@@ -1040,6 +1071,12 @@ const SCRIPT_JS = `
                     }
                     this.updateButtonStates();
                 });
+
+                // 为图片添加懒加载观察
+                const img = item.querySelector('.image-preview');
+                if (img) {
+                    this.observer.observe(img);
+                }
 
                 return item;
             }
@@ -1249,9 +1286,12 @@ async function handleListImages(request, env) {
             name: obj.key,
             url: `${env.R2_DOMAIN}/${obj.key}`,
             size: obj.size,
-            uploaded: obj.uploaded,
+            uploaded: obj.uploaded.toISOString(), // 确保上传时间被正确转换
             type: obj.httpMetadata?.contentType || 'image/*'
         }));
+
+        // 按上传时间从新到旧排序
+        images.sort((a, b) => new Date(b.uploaded) - new Date(a.uploaded));
 
         return new Response(JSON.stringify(images), {
             headers: {
