@@ -2,6 +2,17 @@ export default {
     async fetch(request, env) {
         const url = new URL(request.url);
         const path = url.pathname;
+        
+        // 检查密码（除了图片请求外）
+        if (!path.startsWith('/images/')) {
+            const pwd = url.searchParams.get('pwd');
+            if (!pwd || pwd !== env.PWD) {
+                return new Response('Unauthorized: Invalid or missing password', { 
+                    status: 401,
+                    headers: { 'Content-Type': 'text/plain' }
+                });
+            }
+        }
 
         // 处理 favicon.ico 请求
         if (path === '/favicon.ico') {
@@ -23,12 +34,30 @@ export default {
 
         // 处理静态文件路由
         if (path === '/' || path === '/index.html') {
-            return new Response(INDEX_HTML, {
+            // 修改 HTML 中的所有链接，添加 pwd 参数
+            const html = INDEX_HTML.replace(/href="([^"]+)"/g, (match, p1) => {
+                if (p1.startsWith('http') || p1.startsWith('/images/')) return match;
+                return `href="${p1}${p1.includes('?') ? '&' : '?'}pwd=${url.searchParams.get('pwd')}"`;
+            }).replace(/src="([^"]+)"/g, (match, p1) => {
+                if (p1.startsWith('http') || p1.startsWith('/images/')) return match;
+                return `src="${p1}${p1.includes('?') ? '&' : '?'}pwd=${url.searchParams.get('pwd')}"`;
+            });
+            
+            return new Response(html, {
                 headers: { 'Content-Type': 'text/html' }
             });
         }
         if (path === '/admin') {
-            return new Response(ADMIN_HTML, {
+            // 同样处理 admin 页面的链接
+            const html = ADMIN_HTML.replace(/href="([^"]+)"/g, (match, p1) => {
+                if (p1.startsWith('http') || p1.startsWith('/images/')) return match;
+                return `href="${p1}${p1.includes('?') ? '&' : '?'}pwd=${url.searchParams.get('pwd')}"`;
+            }).replace(/src="([^"]+)"/g, (match, p1) => {
+                if (p1.startsWith('http') || p1.startsWith('/images/')) return match;
+                return `src="${p1}${p1.includes('?') ? '&' : '?'}pwd=${url.searchParams.get('pwd')}"`;
+            });
+            
+            return new Response(html, {
                 headers: { 'Content-Type': 'text/html' }
             });
         }
@@ -820,6 +849,16 @@ const SCRIPT_JS = `
 (function() {
     document.addEventListener('DOMContentLoaded', function() {
         class BaseHandler {
+            constructor() {
+                // 获取当前 URL 中的 pwd 参数
+                this.pwd = new URLSearchParams(window.location.search).get('pwd');
+            }
+
+            // 添加一个方法来构建带密码的 URL
+            buildUrl(url) {
+                return url + (url.includes('?') ? '&' : '?') + 'pwd=' + this.pwd;
+            }
+
             showLoading() {
                 const loading = document.createElement('div');
                 loading.className = 'loading';
@@ -870,7 +909,7 @@ const SCRIPT_JS = `
 
             async loadFolders() {
                 try {
-                    const response = await fetch('/api/images', {
+                    const response = await fetch(this.buildUrl('/api/images'), {
                         cache: 'no-store'
                     });
                     const images = await response.json();
@@ -980,7 +1019,7 @@ const SCRIPT_JS = `
             async loadImages() {
                 const loading = this.showLoading();
                 try {
-                    const response = await fetch('/api/images');
+                    const response = await fetch(this.buildUrl('/api/images'));
                     if (!response.ok) throw new Error('Failed to load images');
                     
                     const images = await response.json();
@@ -1043,7 +1082,7 @@ const SCRIPT_JS = `
                         formData.append('file', file);
                         formData.append('filename', filename);
                         
-                        const response = await fetch('/api/upload', {
+                        const response = await fetch(this.buildUrl('/api/upload'), {
                             method: 'POST',
                             body: formData
                         });
@@ -1158,7 +1197,7 @@ const SCRIPT_JS = `
             async loadImages() {
                 const loading = this.showLoading();
                 try {
-                    const response = await fetch('/api/images', {
+                    const response = await fetch(this.buildUrl('/api/images'), {
                         cache: 'no-store'  // 禁用缓存
                     });
                     if (!response.ok) throw new Error('Failed to load images');
@@ -1182,7 +1221,7 @@ const SCRIPT_JS = `
 
             async loadFolders() {
                 try {
-                    const response = await fetch('/api/images', {
+                    const response = await fetch(this.buildUrl('/api/images'), {
                         cache: 'no-store'
                     });
                     const images = await response.json();
@@ -1317,12 +1356,11 @@ const SCRIPT_JS = `
                 try {
                     const promises = Array.from(this.selectedImages).map(async filename => {
                         try {
-                            // 对文件名进行 URL 编码，但保留斜杠
                             const encodedFilename = filename.split('/')
                                 .map(part => encodeURIComponent(part))
                                 .join('/');
 
-                            const response = await fetch(\`/api/delete/\${encodedFilename}\`, {
+                            const response = await fetch(this.buildUrl(\`/api/delete/\${encodedFilename}\`), {
                                 method: 'DELETE',
                                 cache: 'no-store'
                             });
@@ -1383,7 +1421,7 @@ const SCRIPT_JS = `
                 try {
                     const promises = Array.from(this.selectedImages).map(async filename => {
                         try {
-                            const response = await fetch(\`/api/move/\${filename}\`, {
+                            const response = await fetch(this.buildUrl(\`/api/move/\${filename}\`), {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ folder }),

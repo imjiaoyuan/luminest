@@ -1,0 +1,12 @@
+name = "R2"
+main = "src/worker.js"
+compatibility_date = "2023-12-01"
+
+[[r2_buckets]]
+binding = "MY_BUCKET"
+bucket_name = "images"
+preview_bucket_name = "images"
+
+[vars]
+R2_DOMAIN = "https://images.yuanj.top"
+PWD = ""
