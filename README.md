@@ -11,10 +11,11 @@ cp wrangler.toml.example wrangler.toml
 
 2. 修改 `wrangler.toml` 配置
 ```toml
-name = "r2-picbed"              # Worker 名称
-bucket_name = "images"          # R2 bucket 名称
-R2_DOMAIN = "your-domain.com"   # R2 自定义域名
-PWD = "your-password"           # 访问密码
+name = "luminest"               # Worker 名称
+bucket_name = "your-bucket-name"  # R2 bucket 名称（需要先在 Cloudflare 创建）
+pattern = "your-domain.com"     # 你的自定义域名
+R2_DOMAIN = "your-domain.com"   # 访问域名（通常与自定义域名相同）
+PWD = "your-password"           # 访问密码（用于保护上传和管理功能）
 ```
 
 3. 部署
@@ -24,13 +25,15 @@ wrangler login
 npm run deploy
 ```
 
-4. 访问地址：`https://your-worker.dev/?pwd=your-password`
+4. 访问地址：
+   - 自定义域名：`https://your-domain.com/?pwd=your-password`
+   - Workers 域名：`https://luminest.{username}.workers.dev/?pwd=your-password`
 
 ## Cloudflare 设置
 
 - 确保已在 Cloudflare 中创建 R2 bucket
-- 配置自定义域名（可选）
-- 设置适当的 CORS 策略。
+- 添加个人域名
+- 设置适当的 CORS 策略
 
 ## 开发
 

@@ -1,12 +1,18 @@
-name = "R2"
+name = "luminest"
 main = "src/worker.js"
 compatibility_date = "2023-12-01"
 
+workers_dev = true 
+
+[[routes]]
+pattern = "your-domain.com"
+custom_domain = true
+
 [[r2_buckets]]
 binding = "MY_BUCKET"
-bucket_name = "images"
-preview_bucket_name = "images"
+bucket_name = "your-bucket-name"
+preview_bucket_name = "your-bucket-name"
 
 [vars]
-R2_DOMAIN = "https://images.yuanj.top"
-PWD = ""
+R2_DOMAIN = "your-domain.com"
+PWD = "your-password"
